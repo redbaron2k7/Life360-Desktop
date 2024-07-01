@@ -1,17 +1,18 @@
 const { app, BrowserWindow, ipcMain, net } = require('electron');
 const path = require('path');
 const url = require('url');
-const https = require('https');
 const fs = require('fs');
 
-const API_BASE_URL = 'https://api-cloudfront.life360.com/';
+let mainWindow;
 let accessToken = null;
+const tokenPath = path.join(app.getPath('userData'), 'token.json');
+
+const API_BASE_URL = 'https://api-cloudfront.life360.com/';
 let devMode = false;
 let currentUserId = null;
 let currentCircleId = null;
 let deviceId = null;
 
-let mainWindow;
 let devPanelWindow;
 
 function createWindow() {
@@ -91,27 +92,29 @@ app.on('activate', () => {
 });
 
 async function initializeApp() {
-  loadAccessToken();
+  accessToken = loadAccessToken();
   if (accessToken) {
     try {
       await fetchUserId();
-      deviceId = loadDeviceId();
+      deviceId = await loadDeviceId();
     } catch (error) {
       console.error('Error initializing app:', error);
+      accessToken = null;
     }
   }
 }
 
 function loadAccessToken() {
   try {
-    const data = fs.readFileSync(path.join(app.getPath('userData'), 'token.json'), 'utf8');
+    const data = fs.readFileSync(tokenPath, 'utf8');
     const tokenData = JSON.parse(data);
     if (tokenData.expiresAt > Date.now()) {
-      accessToken = tokenData.token;
+      return tokenData.token;
     }
   } catch (error) {
     console.log('No valid token found');
   }
+  return null;
 }
 
 function saveAccessToken(token, expiresIn) {
@@ -119,7 +122,7 @@ function saveAccessToken(token, expiresIn) {
     token: token,
     expiresAt: Date.now() + expiresIn * 1000
   };
-  fs.writeFileSync(path.join(app.getPath('userData'), 'token.json'), JSON.stringify(tokenData));
+  fs.writeFileSync(tokenPath, JSON.stringify(tokenData));
 }
 
 async function loadDeviceId() {
@@ -153,7 +156,6 @@ async function fetchDeviceId() {
   }
 
   const currentTime = new Date().toISOString();
-
   const options = {
     hostname: 'api-cloudfront.life360.com',
     path: '/v5/circles/devices',
@@ -162,17 +164,16 @@ async function fetchDeviceId() {
       'Authorization': `Bearer ${accessToken}`,
       'ce-id': '92388394-B6FB-5EE5-30EC-5F814CF204AD',
       'ce-type': 'com.life360.cloud.platform.devices.v1',
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Cache-Control': 'no-cache',
-      'Origin': 'https://app.life360.com',
-      'Referer': 'https://app.life360.com/',
+      'User-Agent': 'com.life360.android.safetymapd/KOKO version: 23.49.0 android XX:XX:XX:XX:XX:XX',
       'ce-source': '/iOS',
       'ce-time': currentTime,
       'ce-specversion': '1.0',
       'circleid': currentCircleId
     }
   };
+
+  console.log(`Current Circle ID: ${currentCircleId}`);
+  console.log(`Headers: ${JSON.stringify(options.headers, null, 2)}`);
 
   return new Promise((resolve, reject) => {
     const req = https.request(options, (res) => {
@@ -183,8 +184,12 @@ async function fetchDeviceId() {
       res.on('end', () => {
         if (res.statusCode === 200) {
           const response = JSON.parse(data);
-          const ownDeviceId = response.data.items.find(item => item.owners[0].userId === currentUserId).id;
-          resolve(ownDeviceId);
+          const ownDeviceId = response.data.items.find(item => item.owners[0].userId === currentUserId)?.id;
+          if (ownDeviceId) {
+            resolve(ownDeviceId);
+          } else {
+            reject(new Error('Device ID not found for the current user.'));
+          }
         } else {
           reject(new Error(`Failed to fetch device ID: ${res.statusCode} Body ${res.statusMessage}`));
         }
@@ -295,7 +300,7 @@ async function updateLocationRequest(data) {
   };
 
   const userContextBase64 = Buffer.from(JSON.stringify(userContext)).toString('base64');
-
+  console.log(`Updating Location: ${deviceId}`);
   return makeRequest('PUT', 'https://iphone.life360.com/v4/locations', null, true, {
     'X-Device-ID': deviceId,
     'X-UserContext': userContextBase64,
@@ -318,13 +323,13 @@ ipcMain.handle('loginUser', async (event, credentials) => {
     username: credentials.username,
     password: credentials.password,
   }, false);
-  
+
   if (response.access_token) {
     accessToken = response.access_token;
-    saveAccessToken(response.access_token, 360000);
+    saveAccessToken(response.access_token, response.expires_in || 360000);
     await fetchUserId();
   }
-  
+
   return response;
 });
 
@@ -336,7 +341,7 @@ ipcMain.handle('setCurrentCircle', async (event, circleId) => {
   currentCircleId = circleId;
   try {
     deviceId = await fetchDeviceId();
-    console.log(`Device ID: ${deviceId}`)
+    console.log(`Device ID: ${deviceId}`);
     saveDeviceId(deviceId);
   } catch (error) {
     console.error('Error fetching device ID:', error);
@@ -352,8 +357,23 @@ ipcMain.handle('getMemberLocation', async (event, circleId, memberId) => {
   return makeRequest('GET', `/v3/circles/${circleId}/members/${memberId}`);
 });
 
+ipcMain.handle('getMemberInfo', async (event, circleId, memberId) => {
+  return makeRequest('GET', `/v3/circles/${circleId}/members/${memberId}`);
+});
+
 ipcMain.handle('checkAuthStatus', async () => {
-  return { isAuthenticated: !!accessToken };
+  const token = loadAccessToken();
+  if (token) {
+    accessToken = token;
+    try {
+      await fetchUserId();
+      return { isAuthenticated: true, user: { id: currentUserId } };
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+      return { isAuthenticated: false };
+    }
+  }
+  return { isAuthenticated: false };
 });
 
 ipcMain.handle('toggle-dev-mode', () => {
@@ -372,7 +392,7 @@ ipcMain.handle('dev-custom-request', async (event, { method, path, data, useAuth
 ipcMain.handle('getThreads', async (event) => {
   try {
     const response = await makeRequest('GET', `/v3/circles/threads`);
-    console.log(response.threads);
+    console.log('Fetched threads:', response.threads);
     return response.threads;
   } catch (error) {
     console.error('Error fetching threads:', error);
@@ -382,6 +402,7 @@ ipcMain.handle('getThreads', async (event) => {
 
 ipcMain.handle('sendMessage', async (event, circleId, message, receiverIds) => {
   try {
+    console.log(`Sending message to ${receiverIds}: ${message}`);
     const response = await makeRequest('POST', `/v3/circles/${circleId}/threads/message`, {
       message: message,
       receiverIds: JSON.stringify(receiverIds)
@@ -396,6 +417,7 @@ ipcMain.handle('sendMessage', async (event, circleId, message, receiverIds) => {
 ipcMain.handle('getThreadMessages', async (event, circleId, threadId) => {
   try {
     const response = await makeRequest('GET', `/v3/circles/${circleId}/threads/${threadId}`);
+    console.log('Fetched messages for thread:', threadId, response.messages);
     return response;
   } catch (error) {
     console.error('Error fetching thread messages:', error);

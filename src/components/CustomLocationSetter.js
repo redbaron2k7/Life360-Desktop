@@ -63,7 +63,7 @@ function CustomLocationSetter({ onLocationSet }) {
           className="w-full p-2 rounded"
         />
       </div>
-      {/* Add other fields (altitude, accuracy, heading, speed, etc.) similar to above */}
+      {/* TODO: add other fields (altitude, accuracy, heading, speed, etc.) similar to above (maybe) */}
       <div className="mb-4">
         <label className="text-white block mb-2">Battery Level: {battery}%</label>
         <input

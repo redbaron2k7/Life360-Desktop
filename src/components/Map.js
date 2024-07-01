@@ -7,6 +7,22 @@ import { generateAvatar } from '../utils/avatarGenerator';
 import { updateLocation } from '../api/life360Api';
 const { ipcRenderer } = window.require('electron');
 
+function createCustomLocationIcon() {
+  const svgIcon = `
+    <svg width="30" height="30" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="512" cy="512" r="512" fill="#0096FF"/>
+      <circle cx="512" cy="512" r="320" fill="#ffffff"/>
+      <circle cx="512" cy="512" r="160" fill="#0096FF"/>
+    </svg>
+  `;
+  return L.divIcon({
+    html: svgIcon,
+    className: 'custom-location-icon',
+    iconSize: [30, 30],
+    iconAnchor: [15, 30],
+  });
+}
+
 function createCustomIcon(avatarUrl, name) {
   const iconUrl = avatarUrl || generateAvatar(name);
   return L.divIcon({
@@ -36,7 +52,7 @@ function MapView({ members, onLocationSet }) {
     if (customMarkerRef.current) {
       customMarkerRef.current.setLatLng([lat, lng]);
     } else {
-      const newMarker = L.marker([lat, lng], { draggable: true }).addTo(map);
+      const newMarker = L.marker([lat, lng], { draggable: true, icon: createCustomLocationIcon() }).addTo(map);
       newMarker.on('dragend', async () => {
         const pos = newMarker.getLatLng();
         setSelectedPosition(pos);
@@ -73,7 +89,19 @@ function MapView({ members, onLocationSet }) {
 
 function Map({ onMemberSelect, onLocationSet }) {
   const { currentCircle } = useSelector((state) => state.circle);
+  const [mapKey, setMapKey] = useState(0);
   const mapRef = useRef();
+
+  const refreshMap = () => {
+    setMapKey(prevKey => prevKey + 1);
+  };
+
+  useEffect(() => {
+    ipcRenderer.on('location-updated', refreshMap);
+    return () => {
+      ipcRenderer.removeListener('location-updated', refreshMap);
+    };
+  }, []);
 
   if (!currentCircle || !currentCircle.members || currentCircle.members.length === 0) {
     return <div className="h-full bg-gray-800 flex items-center justify-center text-white">No valid location data available</div>;
@@ -89,6 +117,7 @@ function Map({ onMemberSelect, onLocationSet }) {
 
   return (
     <MapContainer
+      key={mapKey}
       center={center}
       zoom={13}
       style={{ height: '100%', width: '100%' }}

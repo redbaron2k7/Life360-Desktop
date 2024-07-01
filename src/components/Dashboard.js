@@ -4,8 +4,7 @@ import { fetchCircles, fetchCircleDetails, setCurrentCircle } from '../redux/cir
 import MemberList from './MemberList';
 import Map from './Map';
 import CustomLocationSetter from './CustomLocationSetter';
-import Chat from './Chat';
-import ChatList from './ChatList';
+import ChatPopup from './ChatPopup';
 const { ipcRenderer } = window.require('electron');
 
 function Dashboard() {
@@ -13,6 +12,7 @@ function Dashboard() {
   const { circles, currentCircle, status, error } = useSelector((state) => state.circle);
   const mapRef = useRef();
   const [selectedThread, setSelectedThread] = useState(null);
+  const [isChatPopupOpen, setIsChatPopupOpen] = useState(false);
 
   useEffect(() => {
     if (status === 'idle') {
@@ -25,6 +25,10 @@ function Dashboard() {
       handleCircleChange(circles[0].id);
     }
   }, [circles, currentCircle, dispatch]);
+
+  useEffect(() => {
+    console.log('Dashboard: selectedThread changed', selectedThread);
+  }, [selectedThread]);
 
   const handleCircleChange = async (circleId) => {
     try {
@@ -60,17 +64,21 @@ function Dashboard() {
     }
   };
 
-  if (status === 'loading') {
-    return <div className="text-white">Loading circles...</div>;
-  }
+  const toggleChatPopup = () => {
+    setIsChatPopupOpen(!isChatPopupOpen);
+    if (isChatPopupOpen) {
+      setSelectedThread(null);
+    }
+  };
 
-  if (status === 'failed') {
-    return <div className="text-white">Error: {error}</div>;
-  }
+  const handleSelectThread = (thread) => {
+    console.log('Dashboard: handleSelectThread', thread);
+    setSelectedThread(thread);
+  };
 
-  if (!circles || circles.length === 0) {
-    return <div className="text-white">No circles found.</div>;
-  }
+  const handleChatError = (error) => {
+    console.error('Chat error:', error);
+  };
 
   return (
     <div className="flex h-screen bg-gray-900">
@@ -91,14 +99,24 @@ function Dashboard() {
         )}
         {currentCircle && <MemberList onMemberSelect={handleMemberSelect} />}
         <CustomLocationSetter onLocationSet={handleLocationSet} />
-        <ChatList onSelectThread={setSelectedThread} />
+        <button
+          className="bg-blue-500 text-white px-4 py-2 rounded mt-4"
+          onClick={toggleChatPopup}
+        >
+          {isChatPopupOpen ? 'Close Chats' : 'Open Chats'}
+        </button>
       </div>
-      <div className="w-1/2">
+      <div className="w-3/4">
         <Map ref={mapRef} onMemberSelect={handleMemberSelect} onLocationSet={handleLocationSet} />
       </div>
-      <div className="w-1/4 p-4 bg-gray-800">
-        <Chat thread={selectedThread} />
-      </div>
+      {isChatPopupOpen && (
+        <ChatPopup 
+          onClose={toggleChatPopup} 
+          onSelectThread={handleSelectThread} 
+          selectedThread={selectedThread}
+          onError={handleChatError}
+        />
+      )}
     </div>
   );
 }

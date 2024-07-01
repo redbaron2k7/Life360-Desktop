@@ -50,6 +50,16 @@ export const getCircleMembers = async (circleId) => {
   return response;
 };
 
+export const getMemberInfo = async (circleId, memberId) => {
+  try {
+    const response = await ipcRenderer.invoke('getMemberInfo', circleId, memberId);
+    return response;
+  } catch (error) {
+    console.error('Error fetching member info:', error);
+    throw error;
+  }
+};
+
 export default {
   loginUser,
   getCircles,
@@ -61,4 +71,5 @@ export default {
   sendMessage,
   getThreadMessages,
   getCircleMembers,
+  getMemberInfo,
 };

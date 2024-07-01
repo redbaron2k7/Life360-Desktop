@@ -52,7 +52,11 @@ const circleSlice = createSlice({
     status: 'idle',
     error: null,
   },
-  reducers: {},
+  reducers: {
+    resetCurrentCircle: (state) => {
+      state.currentCircle = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchCircles.pending, (state) => {
@@ -77,11 +81,20 @@ const circleSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload;
       })
+      .addCase(setCurrentCircle.pending, (state) => {
+        state.status = 'loading';
+      })
       .addCase(setCurrentCircle.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        // the actual currentCircle will be updated by fetchCircleDetails
+        state.currentCircle = state.circles.find(circle => circle.id === action.payload) || null;
+      })
+      .addCase(setCurrentCircle.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
       });
   },
 });
+
+export const { resetCurrentCircle } = circleSlice.actions;
 
 export default circleSlice.reducer;

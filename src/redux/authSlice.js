@@ -9,7 +9,8 @@ export const login = createAsyncThunk(
       if (!response || !response.access_token || !response.user) {
         throw new Error('Invalid response from server');
       }
-      return response;
+      localStorage.setItem('accessToken', response.access_token);
+      return response.user;
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -20,7 +21,7 @@ export const checkAuth = createAsyncThunk(
   'auth/checkAuth',
   async () => {
     const status = await checkAuthStatus();
-    return status;
+    return status.user;
   }
 );
 
@@ -36,6 +37,7 @@ const authSlice = createSlice({
     logout: (state) => {
       state.user = null;
       state.isAuthenticated = false;
+      localStorage.removeItem('accessToken');
     },
   },
   extraReducers: (builder) => {
@@ -46,7 +48,7 @@ const authSlice = createSlice({
       })
       .addCase(login.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        state.user = action.payload.user;
+        state.user = action.payload;
         state.isAuthenticated = true;
       })
       .addCase(login.rejected, (state, action) => {
@@ -54,7 +56,8 @@ const authSlice = createSlice({
         state.error = action.payload;
       })
       .addCase(checkAuth.fulfilled, (state, action) => {
-        state.isAuthenticated = action.payload.isAuthenticated;
+        state.isAuthenticated = !!action.payload;
+        state.user = action.payload;
       });
   },
 });
