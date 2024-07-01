@@ -23,7 +23,7 @@ Creating the Life360 Desktop application was a journey of dissecting the Life360
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/life360-desktop.git
+   git clone https://github.com/redbaron2k7/life360-desktop.git
    cd life360-desktop
    ```
 
