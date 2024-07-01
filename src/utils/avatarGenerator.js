@@ -1,3 +1,5 @@
+import React from 'react';
+
 export const generateAvatar = (name) => {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
@@ -18,3 +20,33 @@ export const generateAvatar = (name) => {
   
     return canvas.toDataURL();
   };
+
+export const generateGroupAvatar = (avatars) => {
+  return (
+    <div className="relative w-10 h-10">
+      {avatars.map((avatar, index) => (
+        <img
+          key={index}
+          src={avatar}
+          alt="Profile"
+          className={`absolute w-5 h-5 rounded-full border-2 border-white ${getAvatarPositionClass(index)}`}
+        />
+      ))}
+    </div>
+  );
+};
+
+const getAvatarPositionClass = (index) => {
+  switch (index) {
+    case 0:
+      return 'top-0 left-0';
+    case 1:
+      return 'top-0 right-0';
+    case 2:
+      return 'bottom-0 left-0';
+    case 3:
+      return 'bottom-0 right-0';
+    default:
+      return '';
+  }
+};

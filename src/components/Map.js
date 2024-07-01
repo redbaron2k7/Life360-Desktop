@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { generateAvatar } from '../utils/avatarGenerator';
-import { updateLocation } from '../api/life360Api';
+import { updateLocation } from '../api/life360Api';  // Ensure this path is correct
 const { ipcRenderer } = window.require('electron');
 
 function createCustomLocationIcon() {
@@ -72,8 +72,11 @@ function MapView({ members, onLocationSet }) {
       });
       console.log('Location updated:', result);
       onLocationSet(result);
+      ipcRenderer.send('location-updated');  // Notify the main process that location was updated
     } catch (error) {
       console.error('Error updating location:', error);
+      // Notify the main process that location was updated even if there's an error
+      ipcRenderer.send('location-updated');
     }
   };
 
@@ -90,24 +93,38 @@ function MapView({ members, onLocationSet }) {
 function Map({ onMemberSelect, onLocationSet }) {
   const { currentCircle } = useSelector((state) => state.circle);
   const [mapKey, setMapKey] = useState(0);
+  const [members, setMembers] = useState(currentCircle?.members || []);
   const mapRef = useRef();
 
-  const refreshMap = () => {
-    setMapKey(prevKey => prevKey + 1);
+  const refreshMap = async () => {
+    if (currentCircle) {
+      try {
+        const updatedCircleDetails = await ipcRenderer.invoke('getCircleDetails', currentCircle.id);
+        setMembers(updatedCircleDetails.members);
+      } catch (error) {
+        console.error('Error refreshing map:', error);
+      }
+    }
   };
 
   useEffect(() => {
-    ipcRenderer.on('location-updated', refreshMap);
-    return () => {
-      ipcRenderer.removeListener('location-updated', refreshMap);
-    };
-  }, []);
+    if (currentCircle) {
+      setMembers(currentCircle.members || []);
+    }
+  }, [currentCircle]);
 
-  if (!currentCircle || !currentCircle.members || currentCircle.members.length === 0) {
+  useEffect(() => {
+    ipcRenderer.on('refresh-map', refreshMap);
+    return () => {
+      ipcRenderer.removeListener('refresh-map', refreshMap);
+    };
+  }, [currentCircle]);
+
+  if (!currentCircle || !members || members.length === 0) {
     return <div className="h-full bg-gray-800 flex items-center justify-center text-white">No valid location data available</div>;
   }
 
-  const validMembers = currentCircle.members.filter(
+  const validMembers = members.filter(
     member => member.location && typeof member.location.latitude === 'string' && typeof member.location.longitude === 'string'
   );
 
@@ -141,8 +158,7 @@ function Map({ onMemberSelect, onLocationSet }) {
           <Popup>
             <div>
               <h3 className="font-bold">{`${member.firstName || ''} ${member.lastName || ''}`}</h3>
-              <p>{member.location.address1 || member.location.shortAddress || 'Unknown location'}</p>
-              <p>{member.location.address2 || ''}</p>
+              <p>{`${member.location.address1 || ''} ${member.location.address2 || ''}`.trim() || 'Unknown location'}</p>
               <p>Battery: {member.location.battery || 'N/A'}%</p>
             </div>
           </Popup>

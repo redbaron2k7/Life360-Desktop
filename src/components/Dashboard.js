@@ -13,6 +13,7 @@ function Dashboard() {
   const mapRef = useRef();
   const [selectedThread, setSelectedThread] = useState(null);
   const [isChatPopupOpen, setIsChatPopupOpen] = useState(false);
+  const [previousMessageCount, setPreviousMessageCount] = useState(0);
 
   useEffect(() => {
     if (status === 'idle') {
@@ -59,6 +60,7 @@ function Dashboard() {
       });
       console.log('Location updated:', result);
       dispatch(fetchCircleDetails(currentCircle.id));
+      ipcRenderer.send('location-updated'); // Notify that location was updated
     } catch (error) {
       console.error('Error updating location:', error);
     }
@@ -78,10 +80,41 @@ function Dashboard() {
 
   const handleChatError = (error) => {
     console.error('Chat error:', error);
+    // Handle the error, e.g., show a notification to the user
   };
 
+  const checkNewMessages = async () => {
+    try {
+      const threads = await ipcRenderer.invoke('getThreads');
+      const totalMessages = threads.reduce((sum, thread) => sum + (thread.unreadCount || 0), 0);
+      if (totalMessages > previousMessageCount) {
+        const newMessages = totalMessages - previousMessageCount;
+        const newMessageThreads = threads.filter(thread => thread.unreadCount);
+        newMessageThreads.forEach(thread => {
+          const senderId = thread.message.senderId;
+          const senderName = thread.names[senderId]?.name || 'Unknown';
+          const messageText = thread.message.text;
+          const senderAvatar = thread.names[senderId]?.avatar || 'default-avatar-url';
+          ipcRenderer.send('send-notification', {
+            title: senderName,
+            body: messageText,
+            icon: senderAvatar,
+          });
+        });
+      }
+      setPreviousMessageCount(totalMessages);
+    } catch (error) {
+      console.error('Error checking new messages:', error);
+    }
+  };
+
+  useEffect(() => {
+    const intervalId = setInterval(checkNewMessages, 5000); // Check for new messages every 5 seconds
+    return () => clearInterval(intervalId); // Cleanup interval on component unmount
+  }, [previousMessageCount]);
+
   return (
-    <div className="flex h-screen bg-gray-900">
+    <div className="flex h-screen bg-gray-900 relative">
       <div className="w-1/4 p-4 bg-gray-800 overflow-y-auto">
         <h1 className="text-2xl font-bold mb-4 text-white">Life360 Dashboard</h1>
         {circles && circles.length > 0 && (
@@ -99,16 +132,24 @@ function Dashboard() {
         )}
         {currentCircle && <MemberList onMemberSelect={handleMemberSelect} />}
         <CustomLocationSetter onLocationSet={handleLocationSet} />
-        <button
-          className="bg-blue-500 text-white px-4 py-2 rounded mt-4"
-          onClick={toggleChatPopup}
-        >
-          {isChatPopupOpen ? 'Close Chats' : 'Open Chats'}
-        </button>
       </div>
-      <div className="w-3/4">
+      <div className="w-3/4 relative">
         <Map ref={mapRef} onMemberSelect={handleMemberSelect} onLocationSet={handleLocationSet} />
       </div>
+      <button
+        className="fixed top-4 right-4 bg-blue-500 text-white p-3 rounded-full hover:bg-blue-600"
+        style={{ zIndex: 9999 }}
+        onClick={toggleChatPopup}
+      >
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          viewBox="0 0 24 24" 
+          fill="currentColor" 
+          className="w-6 h-6"
+        >
+          <path d="M3 5a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2H7l-4 4V5z"/>
+        </svg>
+      </button>
       {isChatPopupOpen && (
         <ChatPopup 
           onClose={toggleChatPopup} 

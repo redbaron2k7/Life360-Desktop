@@ -246,10 +246,14 @@ function makeRequest(method, path, data = null, useAuth = true, customHeaders = 
       });
 
       response.on('end', () => {
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          resolve(JSON.parse(responseBody));
-        } else {
-          reject(new Error(`HTTP Error: ${response.statusCode}: ${responseBody}`));
+        try {
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            resolve(JSON.parse(responseBody));
+          } else {
+            reject(new Error(`HTTP Error: ${response.statusCode}: ${responseBody}`));
+          }
+        } catch (error) {
+          reject(new Error(`Failed to parse JSON response: ${error.message}. Response body: ${responseBody}`));
         }
       });
     });
@@ -307,6 +311,8 @@ async function updateLocationRequest(data) {
   });
 }
 
+// Authentication and info collection
+
 ipcMain.handle('updateLocation', async (event, locationData) => {
   try {
     const result = await updateLocationRequest(locationData);
@@ -356,7 +362,7 @@ ipcMain.handle('getCircleDetails', async (event, circleId) => {
 ipcMain.handle('getMemberLocation', async (event, circleId, memberId) => {
   return makeRequest('GET', `/v3/circles/${circleId}/members/${memberId}`);
 });
-
+// uhh idk why i did 2 but idc
 ipcMain.handle('getMemberInfo', async (event, circleId, memberId) => {
   return makeRequest('GET', `/v3/circles/${circleId}/members/${memberId}`);
 });
@@ -375,6 +381,8 @@ ipcMain.handle('checkAuthStatus', async () => {
   }
   return { isAuthenticated: false };
 });
+
+// Dev mode stuff
 
 ipcMain.handle('toggle-dev-mode', () => {
   return toggleDevMode();
@@ -423,6 +431,18 @@ ipcMain.handle('getThreadMessages', async (event, circleId, threadId) => {
     console.error('Error fetching thread messages:', error);
     throw error;
   }
+});
+
+// Other utils
+
+ipcMain.on('location-updated', (event) => {
+  if (mainWindow) {
+    mainWindow.webContents.send('refresh-map');
+  }
+});
+
+ipcMain.on('send-notification', (event, { title, body, icon }) => {
+  new Notification({ title, body, icon }).show();
 });
 
 ipcMain.handle('getCircleMembers', async (event, circleId) => {
