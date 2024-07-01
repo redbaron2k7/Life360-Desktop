@@ -7,12 +7,12 @@
     "start": "electron .",
     "dev": "concurrently \"cross-env BROWSER=none webpack serve --mode development\" \"wait-on http://localhost:8080 && cross-env ELECTRON_START_URL=http://localhost:8080 electron .\"",
     "build": "webpack --mode production",
-    "electron-dev": "cross-env ELECTRON_START_URL=http://localhost:8080 electron ."
+    "electron-dev": "cross-env ELECTRON_START_URL=http://localhost:8080 electron .",
+    "dist": "electron-builder"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^1.9.7",
     "autoprefixer": "^10.3.1",
-    "electron": "^13.1.7",
     "getmac": "^5.20.0",
     "leaflet": "^1.9.4",
     "postcss": "^8.3.6",
@@ -31,11 +31,47 @@
     "concurrently": "^6.2.0",
     "cross-env": "^7.0.3",
     "css-loader": "^6.2.0",
+    "electron": "^13.1.7",
+    "electron-builder": "^22.11.7",
     "html-webpack-plugin": "^5.3.2",
     "style-loader": "^3.2.1",
     "wait-on": "^6.0.0",
     "webpack": "^5.47.1",
     "webpack-cli": "^4.7.2",
     "webpack-dev-server": "^4.0.0"
+  },
+  "build": {
+    "appId": "com.yourapp.id",
+    "productName": "Life360 Desktop",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/main.js",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.icns"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
+      "icon": "build"
+    }
   }
 }

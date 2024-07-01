@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, net } = require('electron');
+const { app, BrowserWindow, ipcMain, net, Menu } = require('electron');
 const path = require('path');
 const url = require('url');
 const fs = require('fs');
@@ -23,7 +23,10 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
     },
+    icon: path.join(__dirname, '../build/icon.png')
   });
+
+  Menu.setApplicationMenu(null);
 
   const startUrl = process.env.ELECTRON_START_URL || url.format({
     pathname: path.join(__dirname, '../dist/index.html'),
@@ -36,42 +39,6 @@ function createWindow() {
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
   }
-}
-
-function toggleDevMode() {
-  devMode = !devMode;
-  if (mainWindow) {
-    mainWindow.webContents.send('dev-mode-changed', devMode);
-  }
-  return devMode;
-}
-
-function createDevPanelWindow() {
-  devPanelWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    parent: mainWindow,
-    modal: true,
-    show: false,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-    },
-  });
-
-  devPanelWindow.loadURL(
-    process.env.ELECTRON_START_URL
-      ? `${process.env.ELECTRON_START_URL}#/devpanel`
-      : `file://${path.join(__dirname, '../dist/index.html')}#/devpanel`
-  );
-
-  devPanelWindow.once('ready-to-show', () => {
-    devPanelWindow.show();
-  });
-
-  devPanelWindow.on('closed', () => {
-    devPanelWindow = null;
-  });
 }
 
 app.whenReady().then(() => {
