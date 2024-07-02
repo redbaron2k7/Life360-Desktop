@@ -65,6 +65,7 @@ function MapView({ members, onLocationSet }) {
   };
 
   const handleLocationUpdate = async (lat, lng) => {
+    console.log('Updating location with:', { lat, lng });
     try {
       const result = await updateLocation({
         lat: lat.toString(),
@@ -72,10 +73,9 @@ function MapView({ members, onLocationSet }) {
       });
       console.log('Location updated:', result);
       onLocationSet(result);
-      ipcRenderer.send('location-updated');  // Notify the main process that location was updated
+      ipcRenderer.send('location-updated');
     } catch (error) {
       console.error('Error updating location:', error);
-      // Notify the main process that location was updated even if there's an error
       ipcRenderer.send('location-updated');
     }
   };

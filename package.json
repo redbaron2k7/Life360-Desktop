@@ -3,10 +3,6 @@
   "version": "1.1.0",
   "description": "Life360 Desktop App",
   "main": "electron/main.js",
-  "author": {
-    "name": "Aidan",
-    "email": "aidan@redbaron2k7.com"
-  },
   "scripts": {
     "start": "electron .",
     "dev": "concurrently \"cross-env BROWSER=none webpack serve --mode development\" \"wait-on http://localhost:8080 && cross-env ELECTRON_START_URL=http://localhost:8080 electron .\"",
@@ -45,28 +41,28 @@
     "webpack-dev-server": "^4.0.0"
   },
   "build": {
-    "appId": "com.life360.desktop",
+    "appId": "com.redbaron2k7.life360",
     "productName": "Life360 Desktop",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
     "files": [
       "dist/**/*",
       "electron/**/*"
     ],
-    "directories": {
-      "buildResources": "assets"
-    },
     "win": {
-      "icon": "assets/icon.ico"
+      "target": "nsis",
+      "icon": "build/icon.ico"
     },
     "linux": {
-      "icon": "assets/icon.png",
-      "category": "Utility"
-    },
-    "extraResources": [
-      {
-        "from": "assets/",
-        "to": "assets/",
-        "filter": "**/*"
-      }
-    ]
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "maintainer": "aidan@redbaron2k7.com",
+      "icon": "build/icon.png"
+    }
   }
 }

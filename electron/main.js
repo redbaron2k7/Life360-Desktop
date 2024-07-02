@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, net, Menu } = require('electron');
 const path = require('path');
 const url = require('url');
 const fs = require('fs');
+const https = require('https');
 
 let mainWindow;
 let accessToken = null;
@@ -23,10 +24,8 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
     },
-    icon: path.join(__dirname, '../build/icon.png')
+    icon: path.join(__dirname, 'build/icon.png')
   });
-
-  Menu.setApplicationMenu(null);
 
   const startUrl = process.env.ELECTRON_START_URL || url.format({
     pathname: path.join(__dirname, '../dist/index.html'),
@@ -39,11 +38,66 @@ function createWindow() {
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
   }
+
+  mainWindow.on('closed', function () {
+    mainWindow = null;
+  });
+}
+
+function toggleDevMode() {
+  devMode = !devMode;
+  if (mainWindow) {
+    mainWindow.webContents.send('dev-mode-changed', devMode);
+  }
+  return devMode;
+}
+
+function createDevPanelWindow() {
+  devPanelWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    parent: mainWindow,
+    modal: true,
+    show: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+
+  devPanelWindow.loadURL(
+    process.env.ELECTRON_START_URL
+      ? `${process.env.ELECTRON_START_URL}#/devpanel`
+      : `file://${path.join(__dirname, '../dist/index.html')}#/devpanel`
+  );
+
+  devPanelWindow.once('ready-to-show', () => {
+    devPanelWindow.show();
+  });
+
+  devPanelWindow.on('closed', () => {
+    devPanelWindow = null;
+  });
 }
 
 app.whenReady().then(() => {
   createWindow();
   initializeApp();
+
+  const template = [
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forcereload' },
+        { type: 'separator' },
+        { role: 'toggledevtools', accelerator: 'CmdOrCtrl+Shift+I' }
+      ]
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
 });
 
 app.on('window-all-closed', () => {
@@ -238,6 +292,8 @@ function makeRequest(method, path, data = null, useAuth = true, customHeaders = 
 }
 
 async function updateLocationRequest(data) {
+  console.log('Received data for location update:', data);
+
   const userContext = {
     geolocation: {
       lat: data.lat,
@@ -269,6 +325,8 @@ async function updateLocationRequest(data) {
       clientPlaceBreachAlert: false
     }
   };
+
+  console.log('User context for location update:', userContext);
 
   const userContextBase64 = Buffer.from(JSON.stringify(userContext)).toString('base64');
   console.log(`Updating Location: ${deviceId}`);
