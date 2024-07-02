@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { generateAvatar } from '../utils/avatarGenerator';
-import { updateLocation } from '../api/life360Api';  // Ensure this path is correct
+import { updateLocation } from '../api/life360Api';
 const { ipcRenderer } = window.require('electron');
 
 function createCustomLocationIcon() {
